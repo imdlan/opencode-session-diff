@@ -75,6 +75,25 @@ export default Plugin.define({
               palette: true,
               run: toggleCollapsed,
             },
+            {
+              // Fallback for the diff overlay route: the diffs plugin's own
+              // diff.close layer is not reliably active on the route page, so
+              // Esc/q would strand the user there. Gated to the diff route only.
+              id: "session-changes.diff-back",
+              title: "Close diff viewer",
+              group: "session-changes",
+              bind: "escape",
+              enabled: () => {
+                const current = ctx.ui.router.current()
+                return current.type === "plugin" && current.name === "diff"
+              },
+              run: () => {
+                const current = ctx.ui.router.current()
+                if (current.type === "plugin" && current.name === "diff") {
+                  ;(diffBack ?? (() => ctx.ui.router.navigate({ type: "home" })))()
+                }
+              },
+            },
           ],
         }))
         return null
@@ -174,13 +193,15 @@ export default Plugin.define({
     // diffs plugin id must be passed explicitly (verified in the 2.0.31
     // router: `id: "id" in h ? h.id : t.id`). The route component reads
     // `data.mode` as its initial diff source (Pl → Ui initialMode); "turn"
-    // fetches `session.diff` — the same data as this panel. The panel API
-    // (`ui.panel.open`) cannot pass a mode, so it would always fall back to
-    // the git "branch" source and show "No changes to show" for session-only
-    // changes; the route is an absolute overlay by design.
+    // calls `session.diff({sessionID})` without a message range — the WHOLE
+    // session's cumulative file diff, same data as this panel. The panel API
+    // cannot pass a mode, so it would fall back to the git "branch" source
+    // and show "No changes to show" for session-only changes.
+    let diffBack: (() => void) | undefined
     const openDiff = () => {
       const route = ctx.ui.router.current()
       const sessionID = route.type === "session" ? route.sessionID : untrack(() => snapshot()).sessionID
+      diffBack = () => ctx.ui.router.navigate(route)
       ctx.ui.router.navigate({
         type: "plugin",
         id: "opencode.diffs",

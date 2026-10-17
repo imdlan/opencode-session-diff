@@ -131,7 +131,7 @@ export function renderPanel(props: PanelRenderProps) {
       activeFile !== undefined && (row.file === activeFile || activeFile.endsWith(`/${row.file}`))
     return [
       <Colored fg={isActive ? palette.active : kindColor(row.kind)}>{`${icon} `}</Colored>,
-      dir !== "" ? <Colored fg={palette.muted}>{dir}</Colored> : null,
+      dir !== "" ? <Colored fg={isActive ? palette.active : palette.muted}>{dir}</Colored> : null,
       <Colored fg={isActive ? palette.active : palette.base}>{basename}</Colored>,
       <Counts additions={row.additions} deletions={row.deletions} lead={" ".repeat(gap)} />,
     ]
