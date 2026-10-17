@@ -224,7 +224,10 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 - 排序：修改 > 新增 > 删除，同组按 additions 降序
 - 上限：默认显示前 N=8 行 + `… +M more`；`Ctrl+P` 命令 `Changes: cycle limit`（8/16/all）
 - 折叠态 `▶ Changes (4) +154 −18` 记忆到 kv
-- 点击文件列表 → 打开官方 diff 查看器：`router.navigate({type:"plugin", id:"opencode.diffs", name:"diff", data:{sessionID, returnRoute, diffs:{source:"turn"}}})`。⚠️ 插件路由按插件 id 命名空间化——省略 `id` 会被解析为当前插件（`session-changes/diff` → Unknown），跨插件导航必须显式传目标插件 id。**`turn` source 内部取 `session.diff`，与本面板同源**；默认 `branch` source 走 git base 比对，会话内改动会显示 "No changes to show"（官方查看器不支持按文件聚焦，进入后用 `n`/`p` 切文件）
+- 点击文件列表 → 打开官方 diff 查看器：`router.navigate({type:"plugin", id:"opencode.diffs", name:"diff", data:{sessionID, returnRoute, mode:"turn"}})`
+  - 路由按插件 id 命名空间化：省略 `id` 会被解析为当前插件（`session-changes/diff` → Unknown），跨插件导航必须显式传目标插件 id
+  - 路由组件读 **`data.mode`** 作为初始 source（`Pl` → `Ui.initialMode`）；`turn` 内部取 `session.diff`，与本面板同源
+  - panel API（`ui.panel.open`）无法携带 mode → 永远回落 git `branch` source（会话内改动显示 "No changes to show"）；且该路由本身是 absolute 全屏 overlay（官方设计）
 - 最近编辑高亮：`session.tool.input.ended` 提取编辑类工具的目标文件（权威触发）→ 5 秒 warning 色；`session.tool.success` 的 `metadata.files` 兜底；`filesystem.changed` 作为外部编辑的补充触发
 - "editing now"：最近 2s 内 `file.edited` 命中的文件前加 `●` spinner 字符（可选，M3）
 - 空态（diff 空数组）：整节不渲染
