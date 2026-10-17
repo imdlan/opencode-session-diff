@@ -121,11 +121,14 @@ export default Plugin.define({
       )
     }
 
-    // --- currently-edited highlight (filesystem.changed → 5s decay) --------
+    // --- currently-edited highlight ----------------------------------------
+    // Primary trigger: the session's own editing tools. `session.tool.input.
+    // ended` carries the final input JSON, so the target file is deterministic;
+    // `session.tool.success` metadata.files is the fallback. The filesystem
+    // watcher event remains as a secondary trigger (external edits).
     const [edited, setEdited] = createSignal<string | undefined>(undefined)
     let editedTimer: ReturnType<typeof setTimeout> | undefined
-    const stopFilesystem = ctx.data.on("filesystem.changed", (event) => {
-      const file = event.data?.file
+    const markEdited = (file: string | undefined) => {
       if (!file) return
       setEdited(file)
       if (editedTimer !== undefined) clearTimeout(editedTimer)
@@ -133,17 +136,52 @@ export default Plugin.define({
         editedTimer = undefined
         setEdited(undefined)
       }, EDIT_HIGHLIGHT_MS)
+    }
+
+    const toolNames = new Map<string, string>()
+    const isEditTool = (name: string) => /edit|write|patch/i.test(name)
+    const extractFile = (text: string): string | undefined => {
+      const match = /"(?:filePath|path|file)"\s*:\s*"((?:[^"\\]|\\.)+)"/.exec(text)
+      return match?.[1]
+    }
+
+    const stopInput = ctx.data.on("session.tool.input.started", (event) => {
+      toolNames.set(event.data.id, event.data.name)
+    })
+    const stopInputEnded = ctx.data.on("session.tool.input.ended", (event) => {
+      const name = toolNames.get(event.data.id)
+      if (name === undefined || !isEditTool(name)) return
+      markEdited(extractFile(event.data.text))
+    })
+    const stopToolSuccess = ctx.data.on("session.tool.success", (event) => {
+      const name = toolNames.get(event.data.id)
+      toolNames.delete(event.data.id)
+      if (name === undefined || !isEditTool(name)) return
+      const files = event.data.metadata?.files
+      const first = Array.isArray(files) ? (files[0] as { file?: unknown } | undefined)?.file : undefined
+      markEdited(typeof first === "string" ? first : undefined)
+    })
+    const stopToolFailed = ctx.data.on("session.tool.failed", (event) => {
+      toolNames.delete(event.data.id)
+    })
+    const stopFilesystem = ctx.data.on("filesystem.changed", (event) => {
+      markEdited(event.data?.file)
     })
 
     // --- open the built-in diff viewer -------------------------------------
-    // The viewer route is named "diff" (verified in the 2.0.31 binary). Like
-    // the host's own diff.open command, prefer the session panel; fall back to
-    // a plugin route when no panel can open (e.g. home route).
+    // The viewer route is named "diff" (verified in the 2.0.31 binary). Its
+    // "turn" source fetches `session.diff` — the same data as this panel — so
+    // the viewer lists exactly the rows shown here. The default "branch"
+    // source diffs against the git base instead and showed "No changes to
+    // show" for session-only changes.
     const openDiff = () => {
-      if (ctx.ui.panel.open("diff")) return
       const route = ctx.ui.router.current()
       const sessionID = route.type === "session" ? route.sessionID : untrack(() => snapshot()).sessionID
-      ctx.ui.router.navigate({ type: "plugin", name: "diff", data: { sessionID, returnRoute: route } })
+      ctx.ui.router.navigate({
+        type: "plugin",
+        name: "diff",
+        data: { sessionID, returnRoute: route, diffs: { source: "turn" } },
+      })
     }
 
     // --- panel claim (rebuilt on snapshot / collapse / theme change) --------
@@ -206,6 +244,10 @@ export default Plugin.define({
       stopPanel?.()
       for (const stop of stops) stop()
       stopFilesystem()
+      stopInput()
+      stopInputEnded()
+      stopToolSuccess()
+      stopToolFailed()
       if (timer !== undefined) clearTimeout(timer)
       if (editedTimer !== undefined) clearTimeout(editedTimer)
     }
