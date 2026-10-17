@@ -224,7 +224,8 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 - 排序：修改 > 新增 > 删除，同组按 additions 降序
 - 上限：默认显示前 N=8 行 + `… +M more`；`Ctrl+P` 命令 `Changes: cycle limit`（8/16/all）
 - 折叠态 `▶ Changes (4) +154 −18` 记忆到 kv
-- 点击行 → `api.keymap.dispatchCommand("diff.open")` 打开官方 diff 查看器（route 名 M2 验证）
+- 点击文件列表 → 打开官方 diff 查看器（`ctx.ui.panel.open("diff")`，失败回退 `router.navigate({type:"plugin",name:"diff"})`）；官方查看器**不支持按文件聚焦**，进入后用 `n`/`p` 切文件
+- 最近编辑高亮：`filesystem.changed` 事件命中文件后，圆点与文件名变为 warning 色，5 秒后自动褪色
 - "editing now"：最近 2s 内 `file.edited` 命中的文件前加 `●` spinner 字符（可选，M3）
 - 空态（diff 空数组）：整节不渲染
 

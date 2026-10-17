@@ -41,9 +41,12 @@ export type PanelRenderProps = {
   readonly collapsed: boolean
   /** Classified, ordered rows (classifyAll output) for THIS session. */
   readonly rows: readonly ChangedFile[]
-  /** Click-to-collapse: the title row is the hit target (host paints a
-   *  synchronous snapshot, so the toggle flows back through claim rebuild). */
+  /** Most recently edited file (highlighted); undefined when none recent. */
+  readonly activeFile?: string
+  /** Click-to-collapse: the title row is the hit target. */
   readonly onToggle: () => void
+  /** Click a file row: open the built-in diff viewer for this session. */
+  readonly onOpenDiff: () => void
 }
 
 /**
@@ -51,7 +54,7 @@ export type PanelRenderProps = {
  * Empty rows produce nothing (docs §4 空态：整节不渲染).
  */
 export function renderPanel(props: PanelRenderProps) {
-  const { ctx, collapsed, rows, onToggle } = props
+  const { ctx, collapsed, rows, activeFile, onToggle, onOpenDiff } = props
   const { shown, hidden } = limitRows(rows)
 
   const palette = {
@@ -59,6 +62,7 @@ export function renderPanel(props: PanelRenderProps) {
     muted: ctx.theme.text.muted,
     added: ctx.theme.text.feedback.success.base,
     deleted: ctx.theme.text.feedback.error.base,
+    active: ctx.theme.text.feedback.warning.base,
   }
   const kindColor = (kind: RowKind): Color =>
     kind === "added" ? palette.added : kind === "deleted" ? palette.deleted : kind === "binary" ? palette.muted : palette.base
@@ -120,16 +124,21 @@ export function renderPanel(props: PanelRenderProps) {
     const slash = path.lastIndexOf("/")
     const dir = slash === -1 ? "" : path.slice(0, slash + 1)
     const basename = slash === -1 ? path : path.slice(slash + 1)
+    // Recently-edited file: the whole bullet turns warning-colored and the
+    // basename brightens, so the live target stands out from kind colors.
+    // The event may report an absolute path while rows are project-relative.
+    const isActive =
+      activeFile !== undefined && (row.file === activeFile || activeFile.endsWith(`/${row.file}`))
     return [
-      <Colored fg={kindColor(row.kind)}>{`${icon} `}</Colored>,
+      <Colored fg={isActive ? palette.active : kindColor(row.kind)}>{`${icon} `}</Colored>,
       dir !== "" ? <Colored fg={palette.muted}>{dir}</Colored> : null,
-      <Colored fg={palette.base}>{basename}</Colored>,
+      <Colored fg={isActive ? palette.active : palette.base}>{basename}</Colored>,
       <Counts additions={row.additions} deletions={row.deletions} lead={" ".repeat(gap)} />,
     ]
   }
 
   const body = collapsed ? null : (
-    <text wrapMode="none">
+    <text wrapMode="none" onMouseUp={onOpenDiff}>
       {shown.flatMap((row, index) => [index > 0 ? "\n" : "", ...rowSegments(row)])}
       {hidden > 0 ? "\n" : ""}
       {hidden > 0 ? <Colored fg={palette.muted}>{`… +${hidden} more`}</Colored> : null}

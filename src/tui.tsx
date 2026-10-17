@@ -44,6 +44,9 @@ const REFRESH_EVENTS = [
 
 const REFRESH_DEBOUNCE_MS = 500
 
+/** How long a file stays highlighted after the last filesystem change. */
+const EDIT_HIGHLIGHT_MS = 5_000
+
 export default Plugin.define({
   id: "session-changes",
   setup(ctx) {
@@ -118,10 +121,36 @@ export default Plugin.define({
       )
     }
 
+    // --- currently-edited highlight (filesystem.changed → 5s decay) --------
+    const [edited, setEdited] = createSignal<string | undefined>(undefined)
+    let editedTimer: ReturnType<typeof setTimeout> | undefined
+    const stopFilesystem = ctx.data.on("filesystem.changed", (event) => {
+      const file = event.data?.file
+      if (!file) return
+      setEdited(file)
+      if (editedTimer !== undefined) clearTimeout(editedTimer)
+      editedTimer = setTimeout(() => {
+        editedTimer = undefined
+        setEdited(undefined)
+      }, EDIT_HIGHLIGHT_MS)
+    })
+
+    // --- open the built-in diff viewer -------------------------------------
+    // The viewer route is named "diff" (verified in the 2.0.31 binary). Like
+    // the host's own diff.open command, prefer the session panel; fall back to
+    // a plugin route when no panel can open (e.g. home route).
+    const openDiff = () => {
+      if (ctx.ui.panel.open("diff")) return
+      const route = ctx.ui.router.current()
+      const sessionID = route.type === "session" ? route.sessionID : untrack(() => snapshot()).sessionID
+      ctx.ui.router.navigate({ type: "plugin", name: "diff", data: { sessionID, returnRoute: route } })
+    }
+
     // --- panel claim (rebuilt on snapshot / collapse / theme change) --------
     createEffect(() => {
       const snap = snapshot()
       const collapsed = store.collapsed // tracked: toggle rebuilds the claim
+      const activeFile = edited() // tracked: highlight changes rebuild the claim
       // Track theme tokens: `ctx.theme` is a live getter over the host's theme
       // signal (verified: `get theme(){return themes.currentTokens()}`), so a
       // theme resolve/switch re-runs this effect and the claim is rebuilt with
@@ -151,7 +180,7 @@ export default Plugin.define({
             })
           }
           const rows = sessionID === snap.sessionID ? snap.rows : []
-          return renderPanel({ ctx, collapsed, rows, onToggle: toggleCollapsed })
+          return renderPanel({ ctx, collapsed, rows, activeFile, onToggle: toggleCollapsed, onOpenDiff: openDiff })
         },
       })
       // Session revealed on a previous pass but never fetched (e.g. events
@@ -176,7 +205,9 @@ export default Plugin.define({
       stopCommands()
       stopPanel?.()
       for (const stop of stops) stop()
+      stopFilesystem()
       if (timer !== undefined) clearTimeout(timer)
+      if (editedTimer !== undefined) clearTimeout(editedTimer)
     }
   },
 })
