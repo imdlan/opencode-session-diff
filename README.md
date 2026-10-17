@@ -1,5 +1,7 @@
 # opencode-session-diff
 
+> **Not an official OpenCode / SST product.** This is a community plugin, not affiliated with or endorsed by OpenCode.
+
 **English** | [简体中文](README.zh-CN.md)
 
 [![npm version](https://img.shields.io/npm/v/opencode-session-diff.svg)](https://www.npmjs.com/package/opencode-session-diff)

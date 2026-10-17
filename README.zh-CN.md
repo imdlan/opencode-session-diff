@@ -1,5 +1,7 @@
 # opencode-session-diff
 
+> **非 OpenCode / SST 官方产品。** 本插件为社区作品，与 OpenCode 官方无隶属或背书关系。
+
 [English](README.md) | **简体中文**
 
 [![npm version](https://img.shields.io/npm/v/opencode-session-diff.svg)](https://www.npmjs.com/package/opencode-session-diff)
