@@ -2,6 +2,9 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+[![npm version](https://img.shields.io/npm/v/opencode-session-diff.svg)](https://www.npmjs.com/package/opencode-session-diff)
+[![license](https://img.shields.io/github/license/imdlan/opencode-session-diff.svg)](LICENSE)
+
 > Changes sidebar panel for OpenCode — see every file the current session touched, at a glance.
 
 A TUI plugin for [OpenCode](https://opencode.ai) that adds a **Changes** section to the session sidebar. It lists every file the current session modified, added, or deleted, with ± line counts, highlights the file being edited right now, and click-through to the built-in diff viewer.

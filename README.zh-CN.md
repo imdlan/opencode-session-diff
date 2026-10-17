@@ -2,6 +2,9 @@
 
 [English](README.md) | **简体中文**
 
+[![npm version](https://img.shields.io/npm/v/opencode-session-diff.svg)](https://www.npmjs.com/package/opencode-session-diff)
+[![license](https://img.shields.io/github/license/imdlan/opencode-session-diff.svg)](LICENSE)
+
 > OpenCode 侧边栏「Changes」面板：一眼看清当前会话动了哪些文件。
 
 这是一个 [OpenCode](https://opencode.ai) TUI 插件，在会话侧边栏增加 **Changes** 板块：列出当前会话修改/新增/删除的全部文件，附 ± 行数统计，实时高亮正在编辑的文件，点击可直接打开官方 diff 查看器。
