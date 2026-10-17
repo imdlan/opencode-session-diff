@@ -169,16 +169,20 @@ export default Plugin.define({
     })
 
     // --- open the built-in diff viewer -------------------------------------
-    // The viewer route is named "diff" (verified in the 2.0.31 binary). Its
-    // "turn" source fetches `session.diff` — the same data as this panel — so
-    // the viewer lists exactly the rows shown here. The default "branch"
-    // source diffs against the git base instead and showed "No changes to
-    // show" for session-only changes.
+    // Routes are namespaced by plugin id: a bare `{type:"plugin", name}` is
+    // resolved against THIS plugin (session-changes/diff → Unknown), so the
+    // diffs plugin id must be passed explicitly (verified in the 2.0.31
+    // router: `id: "id" in h ? h.id : t.id`). The viewer's "turn" source
+    // fetches `session.diff` — the same data as this panel — so the viewer
+    // lists exactly the rows shown here. The default "branch" source diffs
+    // against the git base instead and showed "No changes to show" for
+    // session-only changes.
     const openDiff = () => {
       const route = ctx.ui.router.current()
       const sessionID = route.type === "session" ? route.sessionID : untrack(() => snapshot()).sessionID
       ctx.ui.router.navigate({
         type: "plugin",
+        id: "opencode.diffs",
         name: "diff",
         data: { sessionID, returnRoute: route, diffs: { source: "turn" } },
       })
