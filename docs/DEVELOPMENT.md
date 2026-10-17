@@ -57,16 +57,21 @@ type FileDiff = {
 }
 ```
 
-### 2.2 事件推送（核心刷新机制）
+### 2.2 刷新机制（V2 实证修正）
+
+> ⚠️ V1 SDK 的 `EventSessionDiff` 全量推送事件在 **V2 @opencode/client 事件清单中不存在**（已核对完整事件 union）。刷新采用"事件触发 + 防抖重取"：
 
 ```ts
-api.event.on("session.diff", (e) => {
-  // e.properties: { sessionID: string, diff: Array<FileDiff> }
-  // 服务端在 diff 变化时推全量数组 —— 无需重新请求、无需轮询
-})
+// 拉取（Promise 客户端）：
+await ctx.client.session.diff({ sessionID })   // → readonly FileDiff.Info[]
+
+// 刷新触发点（ctx.data.on）：
+"session.execution.succeeded"   // 回合成功（主刷新点）
+"session.idle"                  // 回合结束（兜底）
+"session.revert.staged" | "session.revert.cleared" | "session.revert.committed"   // undo 后回退
 ```
 
-备选事件：`file.edited`（单文件粒度，仅作"editing now"标记用）、`session.idle`（兜底）。
+防抖 500ms 合并连发；重取为一次轻量 GET，回合粒度足够。
 
 ### 2.3 免费的会话级汇总
 
@@ -74,14 +79,28 @@ api.event.on("session.diff", (e) => {
 Session.summary?: { additions: number; deletions: number; files: number; diffs?: Array<FileDiff> }
 ```
 
-### 2.4 增/删/改判定规则（因 before/after 未填充，只能用计数启发式）
+### 2.4 增/删/改判定规则（V2 权威字段）
 
-| 条件 | 判定 | 展示 |
+V2 `@opencode/schema` 的 `FileDiff.Info` **直接携带 status 枚举**（已核对 schema 源码）：
+
+```ts
+type FileDiff.Info = {
+  file: string
+  patch: string          // unified diff 文本（侧边栏不用，仅备用）
+  additions: number
+  deletions: number
+  status: "added" | "deleted" | "modified"   // ← 权威分类，无需推断
+}
+```
+
+| status | 图标 | 着色 |
 |---|---|---|
-| `deletions === 0 && additions > 0` | 新增 | `＋` 绿 |
-| `additions === 0 && deletions > 0` | 删除 | `－` 红（**纯删除样本未抽到，假设 `+0 −N`，M1 里必须人造场景验证**） |
-| `additions > 0 && deletions > 0` | 修改 | `✎` 默认色 + 绿增红删 |
-| `additions === 0 && deletions === 0` | 二进制/不可统计 | `●` muted，仅列文件名 |
+| `modified` | `✎` | 默认色 + `+a` 绿 `−d` 红 |
+| `added` | `＋` | 绿 |
+| `deleted` | `－` | 红 |
+| 二进制（additions=0 && deletions=0） | `●` | muted |
+
+> 注：裸 HTTP `/api/session/:id/diff` 实测响应不含 `before/after` 填充值，但 V2 client schema 承诺 `status`；实现时以实际返回为准，若 `status` 缺失再降级为 ±计数启发式（`del===0 → added`，`add===0 → deleted`）。
 
 ### 2.5 侧边栏挂载点（slot）
 
@@ -94,19 +113,35 @@ Session.summary?: { additions: number; deletions: number; files: number; diffs?:
 - 侧边栏固定宽 **42 列**；非 git 目录 / subagent 子会话（`session.parentID != null`）宿主不显示侧边栏，插件无需处理。
 - 空态策略与官方 `opencode.sidebar.context` 一致：无数据时整节隐藏。
 
-### 2.6 TUI 插件契约（双导出，照抄 OMO 模式）
+### 2.6 TUI 插件契约（V2 官方 `@opencode/plugin@2.0.32` 实证）
 
-```jsonc
-// package.json
-{
-  "exports": { ".": "./dist/index.js", "./tui": "./dist/tui.js" }
-  // v1 宿主另需 "tui" 字段 → 实现时以 OMO graph-live 双样本对照
-}
+**依赖包裁定**：`@opencode/plugin`（2.0.x，thdxr/sst 维护，与 CLI 同版本线）是 **V2 官方包**；`@opencode-ai/plugin`（1.19.x）是 V1 包（oh-my-opencode-slim 依赖它）。本项目用 `@opencode/plugin`。
+
+```tsx
+import { Plugin, usePlugin } from "@opencode/plugin/tui"
+
+export default Plugin({
+  id: "session-changes",
+  setup(ctx) {                                    // ctx: Plugin.Context
+    const stop = ctx.ui.slot({
+      append: "sidebar.content",                  // slot: "sidebar.content" | "sidebar.footer" | ...
+      render: (input: { sessionID: string }) => <ChangesPanel ctx={ctx} sessionId={input.sessionID} />,
+    })
+    return () => stop()                           // Cleanup
+  },
+})
 ```
 
-- 渲染栈：`@opentui/solid`（JSX）+ solid-js 响应式，构建时 **external**
-- 插件形态：`export const tui: TuiPlugin = async (api, options, meta) => {...}`
-- `api.client`：完整 `OpencodeClient`；`api.event`：事件总线；`api.theme`：主题色
+- `Plugin.Context` 关键字段（dist/tui/context.d.ts 已核对）：
+  - `ctx.client: OpenCodeClient`（promise 客户端，`client.session.diff({sessionID})`）
+  - `ctx.data.on(type, handler)` 事件订阅（事件 union 见 @opencode/client promise/generated/types.d.ts）
+  - `ctx.theme: ResolvedTheme` / `ctx.themeMode`（`theme.text.feedback.*` 取色）
+  - `ctx.storage.store<T>(key, {initial}) → [store, mutate]`（持久化折叠态，跨 TUI 实例同步）
+  - `ctx.keymap`（Ctrl+P 命令注册，M3 用）
+  - `ctx.ui.slot(claim)` / `ctx.ui.router` / `ctx.ui.panel` / `ctx.ui.dialog`
+- 渲染：`@opentui/solid` JSX + `solid-js`（For/Show/createSignal/createMemo/onCleanup）
+- 宿主发现：package.json `exports["./tui"]` 子路径（exports-map 探测，graph-live 同款）
+- 参考实现：opencode-graph-live 源码（npm tarball 内 src/tui.tsx）
 
 ### 2.7 官方侧边栏现状（背景）
 
@@ -193,14 +228,14 @@ opencode-session-changes/
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target bun && \
               bun build ./src/tui.tsx --outdir ./dist --target bun \
-                --external @opencode-ai/plugin --external '@opencode-ai/plugin/*' \
                 --external @opencode/plugin --external '@opencode/plugin/*' \
+                --external @opencode/client --external '@opencode/*' \
                 --external '@opentui/*' --external solid-js",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "latest",   // ⚠️ 与 @opencode/plugin 二选一，M1 确认官方渠道
+    "@opencode/plugin": "2.0.32",     // V2 官方包（已裁定）
     "@opentui/solid": "latest",
     "solid-js": "latest",
     "typescript": "^5"
@@ -208,10 +243,7 @@ opencode-session-changes/
 }
 ```
 
-注意（来自竞品源码审计）：
-- `opencode-graph-live` 声明依赖 `@opencode/plugin`
-- `oh-my-opencode-slim` 声明依赖 `@opencode-ai/plugin`
-- 两个包名并存，**M1 第一件事：确认哪个是官方发布渠道**（npm view 两者的 maintainer / repository），externals 两者都写不影响。
+构建 externals 与 graph-live 一致（宿主运行时提供全部依赖）。
 
 ## 7. 里程碑
 
