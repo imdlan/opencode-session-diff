@@ -162,7 +162,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 
 1. **宿主渲染契约（最关键）**：宿主只绘制 `slot.render()` **同步返回**的 JSX 快照。挂载后的 Solid 响应式更新（延迟 `Show` 插入、signal 文本更新、`For` 增长）**一律不上屏**。因此 `panel.tsx` 是纯渲染器，状态在 `tui.tsx`；数据变化时**重建 claim**（stop 旧 `ctx.ui.slot` → 重新注册），宿主重调 `render()` 得到新快照。
 2. **可用行内元素**：行 = `<text>`；色段 = `<text>` 内嵌 `<span fg>`（本地 0.6.6 类型无 `fg`，cast 绕过；运行时支持）。**禁用**：`<text content={StyledText}>`（不绘制）、裸 `<span>`（触发 `Orphan text error … must have a <text> as a parent` 错误框）、`<box>` 根节点（挂载后数秒即停止绘制）。
-3. **布局宽度**：实测侧边栏内容可用宽 **34 列**（42 列侧边栏扣除宿主 padding 2+2 及边框/滚动条）；`layoutRow` 按 34 排版，42 保留为外框约定。**位置**：最终采用 `after: "sidebar.footer"`（footer 边界之后的同级节点 = 侧边栏最底部）；`prepend: "sidebar.content"` 会出现在顶部，`append` 会被 OMO-Slim 等长区块推到折叠线以下。
+3. **布局宽度**：实测侧边栏内容可用宽 **34 列**（42 列侧边栏扣除宿主 padding 2+2 及边框/滚动条）；`layoutRow` 按 34 排版，42 保留为外框约定。**位置**：`append: "sidebar.content"`（插件 enable 顺序在 OMO-Slim 之后 → 渲染于 OMO 板块正下方、footer 之上）。`prepend` 会到顶部；`after: "sidebar.footer"` 会落到侧边栏最底（footer 之下，非期望）。若内容超高，内容区滚动盒负责滚动。
 4. **插件包入口**：`exports["."]` 必须是**合法 server stub**（`Plugin.define({ id, async setup(){} })`，graph-live 模式）；空 `export {}` 会使整包（含 TUI 侧）加载失败。
 5. **本地路径不是合法插件来源**：`plugins` 条目必须是通过校验的 npm/git 说明符，绝对路径被**静默过滤**（`opencode plugin list` 不可见）；`opencode plugin add` 同样拒绝本地路径。本地开发走"安装器缓存植入"：
    ```

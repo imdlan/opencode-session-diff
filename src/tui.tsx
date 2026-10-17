@@ -132,12 +132,11 @@ export default Plugin.define({
       void ctx.theme.text.feedback.error.base
       if (disposed) return
       stopPanel?.()
-      // Anchored `after` the footer boundary: the sidebar column is
-      // [title, content scrollbox, footer], so this lands at the very bottom.
-      // (`prepend: "sidebar.content"` painted at the top; `append` to the
-      // content slot was pushed below the fold by OMO-Slim's long blocks.)
+      // Appended into the content slot: claims render in plugin enable order,
+      // and this plugin enables after OMO-Slim, so the section lands directly
+      // below OMO's block (user-requested position) and above the footer.
       stopPanel = ctx.ui.slot({
-        after: "sidebar.footer",
+        append: "sidebar.content",
         render: (input) => {
           const sessionID = input.sessionID
           if (sessionID !== snap.sessionID) {
