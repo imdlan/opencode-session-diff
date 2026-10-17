@@ -30,8 +30,9 @@ type PluginContext = Plugin.Context
  *  38-column content box or the counters wrap onto a second line. */
 const CONTENT_WIDTH = SIDEBAR_WIDTH - 8
 
-/** Docs §2.4 icons: ✎ modified, ＋ added, － deleted, ● binary (0/0). */
-const KIND_ICON: Record<RowKind, string> = { modified: "✎", added: "＋", deleted: "－", binary: "●" }
+/** Single bullet glyph for every row (user-requested flat look); the kind is
+ *  conveyed by the bullet's color (docs §2.4). */
+const ROW_ICON = "•"
 
 export type PanelRenderProps = {
   readonly ctx: PluginContext
@@ -101,19 +102,19 @@ export function renderPanel(props: PanelRenderProps) {
     </text>
   )
 
-  /** Row segments: `  ✎ dir/basename      +a −d` — dir muted, basename base,
+  /** Row segments: `• dir/basename      +a −d` — bullet muted-by-kind, dir muted, basename base,
    *  counters right-aligned. Returned as inline segments so every row can be
    *  packed into ONE multi-line <text>: separate per-row text renderables are
    *  stacked with the host container's gap, which doubled the line spacing. */
   const rowSegments = (row: ChangedFile) => {
-    const icon = KIND_ICON[row.kind]
+    const icon = ROW_ICON
     const counts = formatCounts(row.additions, row.deletions)
     const { path, gap } = layoutRow(icon, row.file, counts, CONTENT_WIDTH)
     const slash = path.lastIndexOf("/")
     const dir = slash === -1 ? "" : path.slice(0, slash + 1)
     const basename = slash === -1 ? path : path.slice(slash + 1)
     return [
-      <Colored fg={kindColor(row.kind)}>{`  ${icon} `}</Colored>,
+      <Colored fg={kindColor(row.kind)}>{`${icon} `}</Colored>,
       dir !== "" ? <Colored fg={palette.muted}>{dir}</Colored> : null,
       <Colored fg={palette.base}>{basename}</Colored>,
       <Counts additions={row.additions} deletions={row.deletions} lead={" ".repeat(gap)} />,
@@ -124,7 +125,7 @@ export function renderPanel(props: PanelRenderProps) {
     <text>
       {shown.flatMap((row, index) => [index > 0 ? "\n" : "", ...rowSegments(row)])}
       {hidden > 0 ? "\n" : ""}
-      {hidden > 0 ? <Colored fg={palette.muted}>{`  … +${hidden} more`}</Colored> : null}
+      {hidden > 0 ? <Colored fg={palette.muted}>{`… +${hidden} more`}</Colored> : null}
     </text>
   )
 

@@ -2,9 +2,10 @@
  * 42-column sidebar layout helpers (pure functions, no host imports).
  *
  * The sidebar slot is fixed at 42 columns (docs §2.5). Every row is:
- *   "  " + icon + " " + path + gap + counts
- * with the counters right-aligned. Path truncation cuts directory segments
- * from the left first so the basename always survives (docs §4, matrix #6).
+ *   icon + " " + path + gap + counts
+ * flush to the left edge (no indent), with the counters right-aligned.
+ * Path truncation cuts directory segments from the left first so the
+ * basename always survives (docs §4, matrix #6).
  */
 
 export const SIDEBAR_WIDTH = 42
@@ -88,10 +89,10 @@ export type RowLayout = {
   readonly gap: number
 }
 
-/** Fit one sidebar row: truncate the path so that indent + icon + path +
+/** Fit one sidebar row: truncate the path so that icon + space + path +
  *  gap + counts lands exactly on `width` (default 42) columns. */
 export function layoutRow(icon: string, path: string, counts: string, width: number = SIDEBAR_WIDTH): RowLayout {
-  const used = 2 /* indent */ + visibleWidth(icon) + 1 /* space after icon */
+  const used = visibleWidth(icon) + 1 /* space after icon */
   const countsWidth = visibleWidth(counts)
   const budget = width - used - (countsWidth > 0 ? countsWidth + 1 /* min gap */ : 0)
   const truncated = truncatePath(path, Math.max(budget, 1))

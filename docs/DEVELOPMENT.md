@@ -95,10 +95,12 @@ type FileDiff.Info = {
 
 | status | 图标 | 着色 |
 |---|---|---|
-| `modified` | `✎` | 默认色 + `+a` 绿 `−d` 红 |
-| `added` | `＋` | 绿 |
-| `deleted` | `－` | 红 |
-| 二进制（additions=0 && deletions=0） | `●` | muted |
+| `modified` | `•` | 默认色（`text.base`）+ `+a` 绿 `−d` 红 |
+| `added` | `•` | 绿（`feedback.success.base`） |
+| `deleted` | `•` | 红（`feedback.error.base`） |
+| 二进制（additions=0 && deletions=0） | `•` | muted |
+
+> 统一小圆点 `•`，类别只靠颜色区分（用户要求的扁平观感）；行首无缩进，左缘对齐标题。
 
 > 注：裸 HTTP `/api/session/:id/diff` 实测响应不含 `before/after` 填充值，但 V2 client schema 承诺 `status`；实现时以实际返回为准，若 `status` 缺失再降级为 ±计数启发式（`del===0 → added`，`add===0 → deleted`）。
 
@@ -208,11 +210,13 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 
 ```
 ▼ Changes (4)  +154 −18
-  ✎ PicXure/PicXureApp.swift        +28 −9
-  ✎ Views/AnnotationOverlay.swift   +110 −3
-  ＋ i18n/locales/en.json            +13
-  － legacy/main.swift               −6
+• PicXure/PicXureApp.swift        +28 −9
+• Views/AnnotationOverlay.swift   +110 −3
+• i18n/locales/en.json            +13
+• legacy/main.swift               −6
 ```
+
+- 标题行与文件行均**无左侧缩进**，左缘对齐（板块外围无额外水平外边距）
 
 - 标题行：`▼ Changes (N)` + 汇总 `+A −D`（绿/红，取 `theme.text.feedback.*`）；**点击标题行折叠/展开**（`onMouseUp`，折叠态同 `Ctrl+P → Changes: toggle collapse`）
 - 行：图标 + 路径（basename 高亮 `theme.text.base`，目录前缀 muted，超长 truncate 优先砍目录段）+ 右对齐 `+a −d`

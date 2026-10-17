@@ -68,32 +68,32 @@ describe("truncatePath", () => {
 
 describe("layoutRow", () => {
   it("right-aligns counters to exactly the sidebar width (docs §4 example)", () => {
-    const row = layoutRow("✎", "PicXure/PicXureApp.swift", "+28 −9")
+    const row = layoutRow("•", "PicXure/PicXureApp.swift", "+28 −9")
     expect(row.path).toBe("PicXure/PicXureApp.swift")
-    expect(2 + visibleWidth("✎") + 1 + visibleWidth(row.path) + row.gap + visibleWidth("+28 −9")).toBe(SIDEBAR_WIDTH)
-    expect(row.gap).toBe(8)
+    expect(visibleWidth("•") + 1 + visibleWidth(row.path) + row.gap + visibleWidth("+28 −9")).toBe(SIDEBAR_WIDTH)
+    expect(row.gap).toBe(10)
   })
 
   it("reproduces the docs §4 second row", () => {
-    const row = layoutRow("✎", "PicXure/Views/AnnotationOverlay.swift", "+110 −3")
+    const row = layoutRow("•", "PicXure/Views/AnnotationOverlay.swift", "+110 −3")
     expect(row.path).toBe("Views/AnnotationOverlay.swift")
-    expect(row.gap).toBe(2)
+    expect(row.gap).toBe(4)
   })
 
-  it("accounts for fullwidth icons", () => {
-    const row = layoutRow("＋", "i18n/locales/en.json", "+13")
-    expect(2 + visibleWidth("＋") + 1 + visibleWidth(row.path) + row.gap + visibleWidth("+13")).toBe(SIDEBAR_WIDTH)
-    expect(row.gap).toBe(14)
+  it("accounts for every icon width", () => {
+    const row = layoutRow("•", "i18n/locales/en.json", "+13")
+    expect(visibleWidth("•") + 1 + visibleWidth(row.path) + row.gap + visibleWidth("+13")).toBe(SIDEBAR_WIDTH)
+    expect(row.gap).toBe(17)
   })
 
   it("truncates over-long paths to fit long counters", () => {
     const counts = "+1100 −300"
-    const row = layoutRow("✎", "PicXure/Views/AnnotationOverlay.swift", counts)
-    expect(visibleWidth(row.path) + row.gap).toBe(SIDEBAR_WIDTH - 4 - visibleWidth(counts))
+    const row = layoutRow("•", "PicXure/Views/AnnotationOverlay.swift", counts)
+    expect(visibleWidth(row.path) + row.gap).toBe(SIDEBAR_WIDTH - 2 - visibleWidth(counts))
   })
 
   it("drops the gap when there are no counters (binary rows)", () => {
-    const row = layoutRow("●", "assets/logo.png", "")
+    const row = layoutRow("•", "assets/logo.png", "")
     expect(row.gap).toBe(0)
     expect(row.path).toBe("assets/logo.png")
   })
