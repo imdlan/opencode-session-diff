@@ -164,7 +164,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 
 1. **宿主渲染契约（最关键）**：宿主只绘制 `slot.render()` **同步返回**的 JSX 快照。挂载后的 Solid 响应式更新（延迟 `Show` 插入、signal 文本更新、`For` 增长）**一律不上屏**。因此 `panel.tsx` 是纯渲染器，状态在 `tui.tsx`；数据变化时**重建 claim**（stop 旧 `ctx.ui.slot` → 重新注册），宿主重调 `render()` 得到新快照。
 2. **可用行内元素**：行 = `<text>`；色段 = `<text>` 内嵌 `<span style={{ fg }}>`（⚠️ 2026-10-17 修正：TextNode 运行时只识别 `style`/`href` 两个属性，裸 `fg` 会被 `setProperty` **静默丢弃**——此前草稿的 cast 传 `fg` 导致浅色模式下文字全白；`style` 需按本地类型 cast）。**禁用**：`<text content={StyledText}>`（不绘制）、裸 `<span>` 无 `<text>` 父级（Orphan text error 错误框）、`<box>` 根节点（挂载后数秒停止绘制）。
-3. **布局宽度**：实测侧边栏内容可用宽 **34 列**（42 列侧边栏扣除宿主 padding 2+2 及边框/滚动条）；`layoutRow` 按 34 排版，42 保留为外框约定。**位置**：`after: "sidebar.content"`（内容区边界之后的同级节点 = 全部内容 claim（含 OMO-Slim 板块）下方、footer 之上）。实测排序：`append` 渲染在 OMO 上方（claim 按插件 enable 顺序，非注册时间），`prepend` 顶部，`after: "sidebar.footer"` 落到 footer 之下。
+3. **布局宽度**：宿主侧栏布局精确推导：`width 42 − paddingLeft 2 − paddingRight 2 = 38`，内容列再 `paddingRight 1` → **可用 37 列**（`CONTENT_WIDTH = SIDEBAR_WIDTH - 5`；旧值 34 是缩进草稿期的保守值，会造成右侧计数与边框间的可见空隙）。两个文本元素均设 `wrapMode="none"` 防意外换行。**位置**：`after: "sidebar.content"`（内容区边界之后的同级节点 = 全部内容 claim（含 OMO-Slim 板块）下方、footer 之上）。实测排序：`append` 渲染在 OMO 上方（claim 按插件 enable 顺序，非注册时间），`prepend` 顶部，`after: "sidebar.footer"` 落到 footer 之下。
 4. **插件包入口**：`exports["."]` 必须是**合法 server stub**（`Plugin.define({ id, async setup(){} })`，graph-live 模式）；空 `export {}` 会使整包（含 TUI 侧）加载失败。
 5. **本地路径不是合法插件来源**：`plugins` 条目必须是通过校验的 npm/git 说明符，绝对路径被**静默过滤**（`opencode plugin list` 不可见）；`opencode plugin add` 同样拒绝本地路径。本地开发走"安装器缓存植入"：
    ```

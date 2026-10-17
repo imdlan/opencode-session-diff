@@ -25,10 +25,12 @@ import { SIDEBAR_WIDTH, formatCounts, layoutRow } from "./format"
 
 type PluginContext = Plugin.Context
 
-/** The host pads the 42-column sidebar by 2 columns on each side (v2.0.31
- *  sidebar container: paddingLeft 2 / paddingRight 2), so lines must fit the
- *  38-column content box or the counters wrap onto a second line. */
-const CONTENT_WIDTH = SIDEBAR_WIDTH - 8
+/** Exact content width inside the sidebar (host layout, v2.0.31):
+ *  42 sidebar − 2 paddingLeft − 2 paddingRight = 38 inner, minus 1 more
+ *  paddingRight on the content column = 37 usable columns. The previous 34
+ *  was a conservative value from the indented draft and left a visible gap
+ *  between right-aligned counters and the sidebar edge. */
+const CONTENT_WIDTH = SIDEBAR_WIDTH - 5
 
 /** Single bullet glyph for every row (user-requested flat look); the kind is
  *  conveyed by the bullet's color (docs §2.4). */
@@ -96,7 +98,7 @@ export function renderPanel(props: PanelRenderProps) {
   /** `▼ Changes (N)  +A −D` — totals follow the title after two spaces (docs §4).
    *  Click anywhere on the title toggles collapse. */
   const title = (
-    <text onMouseUp={onToggle}>
+    <text onMouseUp={onToggle} wrapMode="none">
       <Colored fg={palette.base}>{`${collapsed ? "▶" : "▼"} Changes (${rows.length})`}</Colored>
       <Counts additions={totals.additions} deletions={totals.deletions} lead="  " />
     </text>
@@ -122,7 +124,7 @@ export function renderPanel(props: PanelRenderProps) {
   }
 
   const body = collapsed ? null : (
-    <text>
+    <text wrapMode="none">
       {shown.flatMap((row, index) => [index > 0 ? "\n" : "", ...rowSegments(row)])}
       {hidden > 0 ? "\n" : ""}
       {hidden > 0 ? <Colored fg={palette.muted}>{`… +${hidden} more`}</Colored> : null}
