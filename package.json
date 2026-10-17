@@ -26,7 +26,8 @@
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/tui.tsx --outdir ./dist --target bun --external @opencode/plugin --external '@opencode/plugin/*' --external @opencode/client --external '@opencode/*' --external '@opentui/*' --external solid-js",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "bun run build"
   },
   "devDependencies": {
     "@opencode/plugin": "2.0.32",
