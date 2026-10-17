@@ -66,6 +66,9 @@ export default Plugin.define({
       render: () => {
         ctx.keymap.layer(() => ({
           mode: "global",
+          // Above the session sidebar's escape layer (priority 10), which
+          // otherwise consumes Esc while the diff overlay is open.
+          priority: 20,
           commands: [
             {
               id: "session-changes.toggle",
@@ -77,12 +80,14 @@ export default Plugin.define({
             },
             {
               // Fallback for the diff overlay route: the diffs plugin's own
-              // diff.close layer is not reliably active on the route page, so
-              // Esc/q would strand the user there. Gated to the diff route only.
+              // diff.close layer is not reliably active on the route page, and
+              // the session sidebar's escape (priority 10) steals the key.
+              // Gated to the diff route only; also reachable from the palette.
               id: "session-changes.diff-back",
               title: "Close diff viewer",
               group: "session-changes",
-              bind: "escape",
+              bind: "escape,q",
+              palette: true,
               enabled: () => {
                 const current = ctx.ui.router.current()
                 return current.type === "plugin" && current.name === "diff"
