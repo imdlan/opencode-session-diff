@@ -161,8 +161,8 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 `▼ Changes (1)  +60 −28` / `  ✎ docs/DEVELOPMENT.md    +60 −28`（30 秒+ 不消失、无错误框）。以下为本轮推翻草稿假设的实测结论，实现必须按此：
 
 1. **宿主渲染契约（最关键）**：宿主只绘制 `slot.render()` **同步返回**的 JSX 快照。挂载后的 Solid 响应式更新（延迟 `Show` 插入、signal 文本更新、`For` 增长）**一律不上屏**。因此 `panel.tsx` 是纯渲染器，状态在 `tui.tsx`；数据变化时**重建 claim**（stop 旧 `ctx.ui.slot` → 重新注册），宿主重调 `render()` 得到新快照。
-2. **可用行内元素**：行 = `<text>`；色段 = `<text>` 内嵌 `<span fg>`（本地 0.6.6 类型无 `fg`，cast 绕过；运行时支持）。**禁用**：`<text content={StyledText}>`（不绘制）、裸 `<span>`（触发 `Orphan text error … must have a <text> as a parent` 错误框）、`<box>` 根节点（挂载后数秒即停止绘制）。
-3. **布局宽度**：实测侧边栏内容可用宽 **34 列**（42 列侧边栏扣除宿主 padding 2+2 及边框/滚动条）；`layoutRow` 按 34 排版，42 保留为外框约定。**位置**：`append: "sidebar.content"`（插件 enable 顺序在 OMO-Slim 之后 → 渲染于 OMO 板块正下方、footer 之上）。`prepend` 会到顶部；`after: "sidebar.footer"` 会落到侧边栏最底（footer 之下，非期望）。若内容超高，内容区滚动盒负责滚动。
+2. **可用行内元素**：行 = `<text>`；色段 = `<text>` 内嵌 `<span style={{ fg }}>`（⚠️ 2026-10-17 修正：TextNode 运行时只识别 `style`/`href` 两个属性，裸 `fg` 会被 `setProperty` **静默丢弃**——此前草稿的 cast 传 `fg` 导致浅色模式下文字全白；`style` 需按本地类型 cast）。**禁用**：`<text content={StyledText}>`（不绘制）、裸 `<span>` 无 `<text>` 父级（Orphan text error 错误框）、`<box>` 根节点（挂载后数秒停止绘制）。
+3. **布局宽度**：实测侧边栏内容可用宽 **34 列**（42 列侧边栏扣除宿主 padding 2+2 及边框/滚动条）；`layoutRow` 按 34 排版，42 保留为外框约定。**位置**：`after: "sidebar.content"`（内容区边界之后的同级节点 = 全部内容 claim（含 OMO-Slim 板块）下方、footer 之上）。实测排序：`append` 渲染在 OMO 上方（claim 按插件 enable 顺序，非注册时间），`prepend` 顶部，`after: "sidebar.footer"` 落到 footer 之下。
 4. **插件包入口**：`exports["."]` 必须是**合法 server stub**（`Plugin.define({ id, async setup(){} })`，graph-live 模式）；空 `export {}` 会使整包（含 TUI 侧）加载失败。
 5. **本地路径不是合法插件来源**：`plugins` 条目必须是通过校验的 npm/git 说明符，绝对路径被**静默过滤**（`opencode plugin list` 不可见）；`opencode plugin add` 同样拒绝本地路径。本地开发走"安装器缓存植入"：
    ```
@@ -172,7 +172,8 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
    首轮 reconcile 以 `install=false` 的 resolve 直接命中缓存、零网络。
 6. **⚠️ 包名冲突（M4 阻塞）**：npm 上 `opencode-session-changes@1.0.0` 已被第三方（kdbsoft，`github.com/kdbsoft/opencode-session-changes`）占用。把裸名写入 `plugins` 会让宿主**下载并加载该第三方代码**（其 tui 入口因缺 react 加载失败，服务端入口却成功）。发布前必须改名（如 `opencode-session-changes-tui` 或 scoped 包），并更新文档/README。
 7. **模块解析**：宿主对 `@opencode/*`、`@opentui/*`、`solid-js` 做运行期映射（磁盘优先，找不到时回落宿主内置实例）。若插件旁存在 node_modules 副本会被优先解析 → 双运行时 → 元素成为宿主无法协调的"外来对象"（短时绘制后被丢弃）。发布物与本地 staging 均不得携带这些运行时依赖（保持 external + devDependency）。
-8. **主题色响应式**：`ctx.theme` 是活 getter（`get theme(){return themes.currentTokens()}`）。palette 必须在 `render()` 调用时读取（不得在 setup 时快照），并在重建 claim 的 `createEffect` 内显式读取主题令牌字段——主题解析/切换时该 effect 重跑、claim 以新调色板重建。标题行 `onMouseUp` 已接点击折叠（文本渲染器支持鼠标事件）。
+8. **主题色响应式**：`ctx.theme` 是活 getter（`get theme(){return themes.currentTokens()}`，currentTokens 为 memo，可被 Solid 追踪）。palette 必须在 `render()` 调用时读取（不得在 setup 时快照），并在重建 claim 的 `createEffect` 内显式读取主题令牌字段——主题解析/切换时该 effect 重跑、claim 以新调色板重建。标题行 `onMouseUp` 已接点击折叠（文本渲染器支持鼠标事件）。
+9. **行距**：每行一个 `<text>` 渲染器时，宿主容器在渲染器之间附加间距（行距接近双倍）。解决：所有文件行合并进**单个多行 `<text>`**，行间以 `"\n"` 分隔；标题仍单独一个 `<text>`（承载点击事件）。
 
 
 ---

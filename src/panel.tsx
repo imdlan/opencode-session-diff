@@ -60,11 +60,12 @@ export function renderPanel(props: PanelRenderProps) {
   const kindColor = (kind: RowKind): Color =>
     kind === "added" ? palette.added : kind === "deleted" ? palette.deleted : kind === "binary" ? palette.muted : palette.base
 
-  /** Colored inline segment. The host runtime's `<span>` takes `fg`; the
-   *  local @opentui/solid 0.6.6 types do not declare it (runtime verified on
-   *  v2.0.31), hence the cast. Must stay inside a `<text>` parent. */
+  /** Colored inline segment. TextNode renderables (spans) only honor the
+   *  `style` and `href` props at runtime — a raw `fg` prop is silently
+   *  dropped (verified in @opentui/solid's setProperty). Hence `style`.
+   *  Must stay inside a `<text>` parent. */
   const Colored = (p: { readonly fg: Color; readonly children?: string }) => (
-    <span {...(p as unknown as Record<string, never>)} />
+    <span style={{ fg: p.fg } as never}>{p.children}</span>
   )
 
   const totals = rows.reduce(
@@ -100,35 +101,37 @@ export function renderPanel(props: PanelRenderProps) {
     </text>
   )
 
-  /** `  ✎ dir/basename      +a −d` — dir muted, basename base, counters right-aligned. */
-  const rowLine = (row: ChangedFile) => {
+  /** Row segments: `  ✎ dir/basename      +a −d` — dir muted, basename base,
+   *  counters right-aligned. Returned as inline segments so every row can be
+   *  packed into ONE multi-line <text>: separate per-row text renderables are
+   *  stacked with the host container's gap, which doubled the line spacing. */
+  const rowSegments = (row: ChangedFile) => {
     const icon = KIND_ICON[row.kind]
     const counts = formatCounts(row.additions, row.deletions)
     const { path, gap } = layoutRow(icon, row.file, counts, CONTENT_WIDTH)
     const slash = path.lastIndexOf("/")
     const dir = slash === -1 ? "" : path.slice(0, slash + 1)
     const basename = slash === -1 ? path : path.slice(slash + 1)
-    return (
-      <text>
-        <Colored fg={kindColor(row.kind)}>{`  ${icon} `}</Colored>
-        {dir !== "" ? <Colored fg={palette.muted}>{dir}</Colored> : null}
-        <Colored fg={palette.base}>{basename}</Colored>
-        <Counts additions={row.additions} deletions={row.deletions} lead={" ".repeat(gap)} />
-      </text>
-    )
+    return [
+      <Colored fg={kindColor(row.kind)}>{`  ${icon} `}</Colored>,
+      dir !== "" ? <Colored fg={palette.muted}>{dir}</Colored> : null,
+      <Colored fg={palette.base}>{basename}</Colored>,
+      <Counts additions={row.additions} deletions={row.deletions} lead={" ".repeat(gap)} />,
+    ]
   }
+
+  const body = collapsed ? null : (
+    <text>
+      {shown.flatMap((row, index) => [index > 0 ? "\n" : "", ...rowSegments(row)])}
+      {hidden > 0 ? "\n" : ""}
+      {hidden > 0 ? <Colored fg={palette.muted}>{`  … +${hidden} more`}</Colored> : null}
+    </text>
+  )
 
   return (
     <Show when={rows.length > 0}>
       {title}
-      <Show when={!collapsed}>
-        <For each={shown}>{(row) => rowLine(row)}</For>
-        <Show when={hidden > 0}>
-          <text>
-            <Colored fg={palette.muted}>{`  … +${hidden} more`}</Colored>
-          </text>
-        </Show>
-      </Show>
+      {body}
     </Show>
   )
 }

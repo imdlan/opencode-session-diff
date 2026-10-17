@@ -132,11 +132,12 @@ export default Plugin.define({
       void ctx.theme.text.feedback.error.base
       if (disposed) return
       stopPanel?.()
-      // Appended into the content slot: claims render in plugin enable order,
-      // and this plugin enables after OMO-Slim, so the section lands directly
-      // below OMO's block (user-requested position) and above the footer.
+      // Anchored `after` the content boundary: sibling of the content slot
+      // inside its container, i.e. below every content claim (OMO-Slim's
+      // block included) and above the footer. `append` rendered above OMO
+      // because claims order by plugin enable order, not by registration time.
       stopPanel = ctx.ui.slot({
-        append: "sidebar.content",
+        after: "sidebar.content",
         render: (input) => {
           const sessionID = input.sessionID
           if (sessionID !== snap.sessionID) {
