@@ -120,7 +120,9 @@ type FileDiff.Info = {
 ```tsx
 import { Plugin, usePlugin } from "@opencode/plugin/tui"
 
-export default Plugin({
+// ⚠️ Plugin 是 namespace 导出（export * as Plugin），不可直接调用；
+// 正确形态为 Plugin.define（已实证 @opencode/plugin 2.0.32）：
+export default Plugin.define({
   id: "session-changes",
   setup(ctx) {                                    // ctx: Plugin.Context
     const stop = ctx.ui.slot({
@@ -131,6 +133,12 @@ export default Plugin({
   },
 })
 ```
+
+实现期实证补充（M2，均已按此落地）：
+- `jsxImportSource` 为 `@opentui/solid`（npm 无 `@opencode/solid` 包）
+- `ctx.theme` 的颜色是 `@opentui/core` 的 `RGBA` 对象（非字符串）；`theme.text.feedback.success/error.base`、`text.base`、`text.muted` 路径有效
+- peer 依赖需补 `@opencode/theme@2.0.32`（ResolvedTheme 类型解析）与 `@types/bun`
+- 行内多色文本用 `StyledText + fg()`（`@opentui/core`）构造，`<span fg>` 类型不支持
 
 - `Plugin.Context` 关键字段（dist/tui/context.d.ts 已核对）：
   - `ctx.client: OpenCodeClient`（promise 客户端，`client.session.diff({sessionID})`）
