@@ -1,7 +1,7 @@
 {
-  "name": "opencode-session-changes",
+  "name": "opencode-session-diff",
   "version": "0.1.0",
-  "description": "OpenCode TUI sidebar panel listing files changed by the current session (+additions/−deletions)",
+  "description": "OpenCode TUI sidebar panel (Changes) listing files changed by the current session, with ±line counts",
   "license": "MIT",
   "keywords": [
     "opencode",
@@ -19,7 +19,9 @@
   "files": [
     "dist/",
     "src/",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/tui.tsx --outdir ./dist --target bun --external @opencode/plugin --external '@opencode/plugin/*' --external @opencode/client --external '@opencode/*' --external '@opentui/*' --external solid-js",
@@ -33,5 +35,16 @@
     "@types/bun": "^1.4.3",
     "solid-js": "latest",
     "typescript": "^5"
+  },
+  "homepage": "https://github.com/imdlan/opencode-session-diff",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imdlan/opencode-session-diff.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imdlan/opencode-session-diff/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

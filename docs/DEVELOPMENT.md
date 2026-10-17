@@ -1,8 +1,8 @@
-# opencode-session-changes 开发文档
+# opencode-session-diff 开发文档
 
 > OpenCode V2 TUI 侧边栏插件：实时显示当前 session 修改 / 新增 / 删除的文件清单（含 ±行数统计），事件驱动，零轮询。
 
-- 包名：`opencode-session-changes`
+- 包名：`opencode-session-diff`（板块名保持 `Changes`；插件 id 仍为 `session-changes`）
 - 目标平台：OpenCode ≥ 2.0.x（TUI 插件体系）
 - 许可：MIT
 - 状态：开发中（本文档为唯一实现依据，所有 API 结论均已实证）
@@ -172,7 +172,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
    ~/.cache/opencode/npm/<target>/<ts>/node_modules/<pkg>/ # 仅 package.json + dist（不含 node_modules！）
    ```
    首轮 reconcile 以 `install=false` 的 resolve 直接命中缓存、零网络。
-6. **⚠️ 包名冲突（M4 阻塞）**：npm 上 `opencode-session-changes@1.0.0` 已被第三方（kdbsoft，`github.com/kdbsoft/opencode-session-changes`）占用。把裸名写入 `plugins` 会让宿主**下载并加载该第三方代码**（其 tui 入口因缺 react 加载失败，服务端入口却成功）。发布前必须改名（如 `opencode-session-changes-tui` 或 scoped 包），并更新文档/README。
+6. **✅ 包名冲突（已解决）**：npm 上 `opencode-session-changes@1.0.0` 已被第三方（kdbsoft，`github.com/kdbsoft/opencode-session-changes`）占用，裸名写入 `plugins` 会让宿主下载并加载该第三方代码。**已改名为 `opencode-session-diff`（npm 可用）**；板块名保持 `Changes`，插件 id 仍为 `session-changes`。发布前确认 README/文档已全部使用新名。
 7. **模块解析**：宿主对 `@opencode/*`、`@opentui/*`、`solid-js` 做运行期映射（磁盘优先，找不到时回落宿主内置实例）。若插件旁存在 node_modules 副本会被优先解析 → 双运行时 → 元素成为宿主无法协调的"外来对象"（短时绘制后被丢弃）。发布物与本地 staging 均不得携带这些运行时依赖（保持 external + devDependency）。
 8. **主题色响应式**：`ctx.theme` 是活 getter（`get theme(){return themes.currentTokens()}`，currentTokens 为 memo，可被 Solid 追踪）。palette 必须在 `render()` 调用时读取（不得在 setup 时快照），并在重建 claim 的 `createEffect` 内显式读取主题令牌字段——主题解析/切换时该 effect 重跑、claim 以新调色板重建。标题行 `onMouseUp` 已接点击折叠（文本渲染器支持鼠标事件）。
 9. **行距**：每行一个 `<text>` 渲染器时，宿主容器在渲染器之间附加间距（行距接近双倍）。解决：所有文件行合并进**单个多行 `<text>`**，行间以 `"\n"` 分隔；标题仍单独一个 `<text>`（承载点击事件）。
@@ -233,7 +233,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 ## 5. 项目结构
 
 ```
-opencode-session-changes/
+opencode-session-diff/
 ├── package.json
 ├── tsconfig.json
 ├── bunfig.toml                # 如需
@@ -257,7 +257,7 @@ opencode-session-changes/
 ```jsonc
 // package.json 关键字段
 {
-  "name": "opencode-session-changes",
+  "name": "opencode-session-diff",
   "version": "0.1.0",
   "type": "module",
   "exports": { ".": "./dist/index.js", "./tui": "./dist/tui.js" },
@@ -291,7 +291,7 @@ opencode-session-changes/
 
 > 注：M2 面板因宿主"仅绘制 render() 同步快照"的约束，实现为纯渲染器 + 数据变化重建 claim（§2.8）；M1 的事件驱动防抖重取语义不变。
 | **M3 打磨** | editing-now 标记 / limit 循环 / truncate 策略 / 非 git 目录静默 | 边界场景全绿（第 8 节矩阵） |
-| **M4 发布** | README + GIF + LICENSE + npm publish（0.1.0） | `opencode plugin add opencode-session-changes@latest` 干净环境可用 |
+| **M4 发布** | README + GIF + LICENSE + npm publish（0.1.0） | `opencode plugin add opencode-session-diff@latest` 干净环境可用 |
 
 ## 8. 测试矩阵（M3 验收用）
 
