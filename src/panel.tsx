@@ -1,94 +1,55 @@
 /**
- * <ChangesPanel> — the sidebar section rendered into the "sidebar.content" slot.
+ * Sidebar section renderer for the "sidebar.content" slot.
  *
- * Data flow (docs §3): a single `readonly FileDiffInfo[]` signal is the only
- * state. It is seeded by a mount-time `client.session.diff` fetch and replaced
- * wholesale by debounced refetches on round/revert events. Render derives:
- * classify → sort → limit → 42-column lines.
+ * Rendering contract (v2.0.31 host, visually verified):
+ * - The host paints only what `render()` returns synchronously. Solid updates
+ *   after mount (Show insertion, signal-driven text changes, <For> growth)
+ *   never reach the screen — the host treats the claim's JSX as a one-shot
+ *   snapshot. So this module is a PURE renderer of `{collapsed, rows}`; all
+ *   state lives in tui.tsx, and every state change rebuilds the claim
+ *   (de-register + re-register the slot) so the host calls `render()` again
+ *   with fresh content.
+ * - One `<text>` per line; colored segments are `<span fg>` children of that
+ *   text (the local @opentui/solid 0.6.6 types do not declare `fg`, hence the
+ *   cast — the host runtime accepts it; visually verified). A bare `<span>`
+ *   outside a `<text>` renders an "orphan text" error box; `<text
+ *   content={StyledText}>` paints nothing; a `<box>` root stops painting
+ *   shortly after mount — all dead ends from the M2 draft, replaced here.
  */
 
 import type { Plugin } from "@opencode/plugin/tui"
-import type { FileDiffInfo } from "@opencode/client"
-import { StyledText, fg } from "@opentui/core"
-import type { Color, TextChunk } from "@opentui/core"
-import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
-import type { Store } from "solid-js/store"
-import { classifyAll, limitRows, type ChangedFile, type RowKind } from "./classify"
-import { formatCounts, layoutRow } from "./format"
+import type { Color } from "@opentui/core"
+import { For, Show } from "solid-js"
+import { limitRows, type ChangedFile, type RowKind } from "./classify"
+import { SIDEBAR_WIDTH, formatCounts, layoutRow } from "./format"
 
 type PluginContext = Plugin.Context
 
-/** Docs §2.2: round success is the main refresh point, idle is the fallback,
- *  revert events cover `/undo`. There is no push event for diffs in V2. */
-const REFRESH_EVENTS = [
-  "session.execution.succeeded",
-  "session.idle",
-  "session.revert.staged",
-  "session.revert.cleared",
-  "session.revert.committed",
-] as const
-
-const REFRESH_DEBOUNCE_MS = 500
+/** The host pads the 42-column sidebar by 2 columns on each side (v2.0.31
+ *  sidebar container: paddingLeft 2 / paddingRight 2), so lines must fit the
+ *  38-column content box or the counters wrap onto a second line. */
+const CONTENT_WIDTH = SIDEBAR_WIDTH - 8
 
 /** Docs §2.4 icons: ✎ modified, ＋ added, － deleted, ● binary (0/0). */
 const KIND_ICON: Record<RowKind, string> = { modified: "✎", added: "＋", deleted: "－", binary: "●" }
 
-export type ChangesPanelProps = {
+export type PanelRenderProps = {
   readonly ctx: PluginContext
-  /** Persistent collapse state store (survives TUI restarts, live-synced). */
-  readonly store: Store<{ collapsed: boolean }>
-  readonly sessionID: string
+  readonly collapsed: boolean
+  /** Classified, ordered rows (classifyAll output) for THIS session. */
+  readonly rows: readonly ChangedFile[]
+  /** Click-to-collapse: the title row is the hit target (host paints a
+   *  synchronous snapshot, so the toggle flows back through claim rebuild). */
+  readonly onToggle: () => void
 }
 
-export function ChangesPanel(props: ChangesPanelProps) {
-  const ctx = props.ctx
-  const [diffs, setDiffs] = createSignal<readonly FileDiffInfo[]>([])
-
-  createEffect(() => {
-    const sessionID = props.sessionID
-    let alive = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-
-    setDiffs([])
-    const refresh = () => {
-      if (!alive || !sessionID) return
-      ctx.client.session.diff({ sessionID }).then(
-        (result) => {
-          if (alive) setDiffs(result)
-        },
-        () => {
-          // Transient fetch failure: keep the last good snapshot.
-        },
-      )
-    }
-
-    refresh() // mount-time first fetch
-    const scheduleRefresh = () => {
-      if (timer !== undefined) clearTimeout(timer)
-      timer = setTimeout(() => {
-        timer = undefined
-        refresh()
-      }, REFRESH_DEBOUNCE_MS)
-    }
-    const stops = REFRESH_EVENTS.map((type) => ctx.data.on(type, scheduleRefresh))
-    onCleanup(() => {
-      alive = false
-      for (const stop of stops) stop()
-      if (timer !== undefined) clearTimeout(timer)
-    })
-  })
-
-  const rows = createMemo(() => classifyAll(diffs()))
-  const limited = createMemo(() => limitRows(rows()))
-  const totals = createMemo(() => {
-    let additions = 0
-    let deletions = 0
-    for (const row of rows()) {
-      additions += row.additions
-      deletions += row.deletions
-    }
-    return { count: rows().length, additions, deletions }
-  })
+/**
+ * Pure render: `▼ Changes (N)  +A −D` title + per-file rows + truncation row.
+ * Empty rows produce nothing (docs §4 空态：整节不渲染).
+ */
+export function renderPanel(props: PanelRenderProps) {
+  const { ctx, collapsed, rows, onToggle } = props
+  const { shown, hidden } = limitRows(rows)
 
   const palette = {
     base: ctx.theme.text.base,
@@ -99,52 +60,75 @@ export function ChangesPanel(props: ChangesPanelProps) {
   const kindColor = (kind: RowKind): Color =>
     kind === "added" ? palette.added : kind === "deleted" ? palette.deleted : kind === "binary" ? palette.muted : palette.base
 
-  const pushCounts = (chunks: TextChunk[], counts: string, lead: string) => {
-    chunks.push(fg(palette.base)(lead))
-    const parts = counts.split(" ")
-    for (const [index, part] of parts.entries()) {
-      if (index > 0) chunks.push(fg(palette.base)(" "))
-      chunks.push(fg(part.startsWith("+") ? palette.added : palette.deleted)(part))
-    }
+  /** Colored inline segment. The host runtime's `<span>` takes `fg`; the
+   *  local @opentui/solid 0.6.6 types do not declare it (runtime verified on
+   *  v2.0.31), hence the cast. Must stay inside a `<text>` parent. */
+  const Colored = (p: { readonly fg: Color; readonly children?: string }) => (
+    <span {...(p as unknown as Record<string, never>)} />
+  )
+
+  const totals = rows.reduce(
+    (acc, row) => ({ additions: acc.additions + row.additions, deletions: acc.deletions + row.deletions }),
+    { additions: 0, deletions: 0 },
+  )
+
+  /** `+A` green / `−D` red spans, zero counters omitted (formatCounts). */
+  const Counts = (p: { readonly additions: number; readonly deletions: number; readonly lead: string }) => {
+    const counts = formatCounts(p.additions, p.deletions)
+    if (counts === "") return null
+    return (
+      <>
+        {p.lead}
+        <For each={counts.split(" ")}>
+          {(part, index) => (
+            <>
+              {index() > 0 ? " " : null}
+              <Colored fg={part.startsWith("+") ? palette.added : palette.deleted}>{part}</Colored>
+            </>
+          )}
+        </For>
+      </>
+    )
   }
 
-  /** `▼ Changes (N)  +A −D` — totals follow the title after two spaces (docs §4). */
-  const titleLine = (): StyledText => {
-    const mark = props.store.collapsed ? "▶" : "▼"
-    const chunks: TextChunk[] = [fg(palette.base)(`${mark} Changes (${totals().count})`)]
-    const counts = formatCounts(totals().additions, totals().deletions)
-    if (counts !== "") pushCounts(chunks, counts, "  ")
-    return new StyledText(chunks)
-  }
+  /** `▼ Changes (N)  +A −D` — totals follow the title after two spaces (docs §4).
+   *  Click anywhere on the title toggles collapse. */
+  const title = (
+    <text onMouseUp={onToggle}>
+      <Colored fg={palette.base}>{`${collapsed ? "▶" : "▼"} Changes (${rows.length})`}</Colored>
+      <Counts additions={totals.additions} deletions={totals.deletions} lead="  " />
+    </text>
+  )
 
   /** `  ✎ dir/basename      +a −d` — dir muted, basename base, counters right-aligned. */
-  const rowLine = (row: ChangedFile): StyledText => {
+  const rowLine = (row: ChangedFile) => {
     const icon = KIND_ICON[row.kind]
     const counts = formatCounts(row.additions, row.deletions)
-    const { path, gap } = layoutRow(icon, row.file, counts)
+    const { path, gap } = layoutRow(icon, row.file, counts, CONTENT_WIDTH)
     const slash = path.lastIndexOf("/")
     const dir = slash === -1 ? "" : path.slice(0, slash + 1)
     const basename = slash === -1 ? path : path.slice(slash + 1)
-    const chunks: TextChunk[] = [fg(kindColor(row.kind))(`  ${icon} `)]
-    if (dir !== "") chunks.push(fg(palette.muted)(dir))
-    chunks.push(fg(palette.base)(basename))
-    if (counts !== "") pushCounts(chunks, counts, " ".repeat(gap))
-    return new StyledText(chunks)
+    return (
+      <text>
+        <Colored fg={kindColor(row.kind)}>{`  ${icon} `}</Colored>
+        {dir !== "" ? <Colored fg={palette.muted}>{dir}</Colored> : null}
+        <Colored fg={palette.base}>{basename}</Colored>
+        <Counts additions={row.additions} deletions={row.deletions} lead={" ".repeat(gap)} />
+      </text>
+    )
   }
 
-  const moreLine = (): StyledText => new StyledText([fg(palette.muted)(`  … +${limited().hidden} more`)])
-
   return (
-    <Show when={rows().length > 0}>
-      <box flexDirection="column">
-        <text content={titleLine()} />
-        <Show when={!props.store.collapsed}>
-          <For each={limited().shown}>{(row) => <text content={rowLine(row)} />}</For>
-          <Show when={limited().hidden > 0}>
-            <text content={moreLine()} />
-          </Show>
+    <Show when={rows.length > 0}>
+      {title}
+      <Show when={!collapsed}>
+        <For each={shown}>{(row) => rowLine(row)}</For>
+        <Show when={hidden > 0}>
+          <text>
+            <Colored fg={palette.muted}>{`  … +${hidden} more`}</Colored>
+          </text>
         </Show>
-      </box>
+      </Show>
     </Show>
   )
 }

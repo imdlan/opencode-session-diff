@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { DEFAULT_ROW_LIMIT, classifyAll, classifyFile, limitRows } from "../src/classify"
+import { DEFAULT_ROW_LIMIT, classifyAll, classifyFile, limitRows, sameRows } from "../src/classify"
 
 describe("classifyFile", () => {
   it("uses the authoritative status field", () => {
@@ -94,5 +94,28 @@ describe("limitRows", () => {
     const { shown, hidden } = limitRows(classifyAll([{ file: "a.txt", additions: 1, deletions: 0, status: "added" }]), 0)
     expect(shown).toHaveLength(0)
     expect(hidden).toBe(1)
+  })
+})
+
+describe("sameRows", () => {
+  const row = (file: string, additions: number, deletions: number, kind: "modified" | "added" = "modified") => ({
+    file,
+    kind,
+    additions,
+    deletions,
+  })
+
+  it("treats identical ordered rows as equal (rebuild skip)", () => {
+    expect(sameRows([row("a.ts", 1, 2), row("b.ts", 3, 0, "added")], [row("a.ts", 1, 2), row("b.ts", 3, 0, "added")])).toBe(true)
+  })
+
+  it("detects count, kind and length changes", () => {
+    expect(sameRows([row("a.ts", 1, 2)], [row("a.ts", 1, 3)])).toBe(false)
+    expect(sameRows([row("a.ts", 1, 2)], [row("a.ts", 1, 2, "added")])).toBe(false)
+    expect(sameRows([row("a.ts", 1, 2)], [])).toBe(false)
+  })
+
+  it("treats reordered rows as different (order carries the sort)", () => {
+    expect(sameRows([row("a.ts", 1, 2), row("b.ts", 3, 4)], [row("b.ts", 3, 4), row("a.ts", 1, 2)])).toBe(false)
   })
 })

@@ -61,6 +61,22 @@ export function classifyAll(diffs: readonly DiffInput[]): ChangedFile[] {
   )
 }
 
+/** Content equality for rebuild-skip decisions (same files, kinds, counts,
+ *  same order). */
+export function sameRows(a: readonly ChangedFile[], b: readonly ChangedFile[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((row, i) => {
+    const other = b[i]
+    return (
+      other !== undefined &&
+      row.file === other.file &&
+      row.kind === other.kind &&
+      row.additions === other.additions &&
+      row.deletions === other.deletions
+    )
+  })
+}
+
 export function limitRows(
   rows: readonly ChangedFile[],
   limit: number = DEFAULT_ROW_LIMIT,

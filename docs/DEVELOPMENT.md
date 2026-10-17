@@ -138,7 +138,7 @@ export default Plugin.define({
 - `jsxImportSource` 为 `@opentui/solid`（npm 无 `@opencode/solid` 包）
 - `ctx.theme` 的颜色是 `@opentui/core` 的 `RGBA` 对象（非字符串）；`theme.text.feedback.success/error.base`、`text.base`、`text.muted` 路径有效
 - peer 依赖需补 `@opencode/theme@2.0.32`（ResolvedTheme 类型解析）与 `@types/bun`
-- 行内多色文本用 `StyledText + fg()`（`@opentui/core`）构造，`<span fg>` 类型不支持
+- 行内多色文本：`<text>` 行内嵌 `<span fg>`（局部 0.6.6 类型未声明 span 的 `fg`，需 cast；宿主运行时支持，已目视验证）。⚠️ M2 草稿中的 `StyledText + content` 与裸 `<span>` 均不可用，见 §2.8
 
 - `Plugin.Context` 关键字段（dist/tui/context.d.ts 已核对）：
   - `ctx.client: OpenCodeClient`（promise 客户端，`client.session.diff({sessionID})`）
@@ -154,6 +154,26 @@ export default Plugin.define({
 ### 2.7 官方侧边栏现状（背景）
 
 V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.context`（token/花费）、`opencode.sidebar.mcp`、`opencode.sidebar.footer`（getting-started + 目录:分支）。本插件将成为第 4 方内容提供者。V1 桌面端的 "Files Changed (N)" 审查面板即本项目的体验原型。
+
+### 2.8 E2E 验收实证（v2.0.31 真机，2026-10-17）
+
+**M2 侧边栏验收已通过**：恢复含改动会话后，侧边栏顶部稳定显示
+`▼ Changes (1)  +60 −28` / `  ✎ docs/DEVELOPMENT.md    +60 −28`（30 秒+ 不消失、无错误框）。以下为本轮推翻草稿假设的实测结论，实现必须按此：
+
+1. **宿主渲染契约（最关键）**：宿主只绘制 `slot.render()` **同步返回**的 JSX 快照。挂载后的 Solid 响应式更新（延迟 `Show` 插入、signal 文本更新、`For` 增长）**一律不上屏**。因此 `panel.tsx` 是纯渲染器，状态在 `tui.tsx`；数据变化时**重建 claim**（stop 旧 `ctx.ui.slot` → 重新注册），宿主重调 `render()` 得到新快照。
+2. **可用行内元素**：行 = `<text>`；色段 = `<text>` 内嵌 `<span fg>`（本地 0.6.6 类型无 `fg`，cast 绕过；运行时支持）。**禁用**：`<text content={StyledText}>`（不绘制）、裸 `<span>`（触发 `Orphan text error … must have a <text> as a parent` 错误框）、`<box>` 根节点（挂载后数秒即停止绘制）。
+3. **布局宽度**：实测侧边栏内容可用宽 **34 列**（42 列侧边栏扣除宿主 padding 2+2 及边框/滚动条）；`layoutRow` 按 34 排版，42 保留为外框约定。**位置**：最终采用 `after: "sidebar.footer"`（footer 边界之后的同级节点 = 侧边栏最底部）；`prepend: "sidebar.content"` 会出现在顶部，`append` 会被 OMO-Slim 等长区块推到折叠线以下。
+4. **插件包入口**：`exports["."]` 必须是**合法 server stub**（`Plugin.define({ id, async setup(){} })`，graph-live 模式）；空 `export {}` 会使整包（含 TUI 侧）加载失败。
+5. **本地路径不是合法插件来源**：`plugins` 条目必须是通过校验的 npm/git 说明符，绝对路径被**静默过滤**（`opencode plugin list` 不可见）；`opencode plugin add` 同样拒绝本地路径。本地开发走"安装器缓存植入"：
+   ```
+   ~/.cache/opencode/npm/<target>/<ts>/package.json        # {"dependencies": {"<pkg>": "0.1.0"}}
+   ~/.cache/opencode/npm/<target>/<ts>/node_modules/<pkg>/ # 仅 package.json + dist（不含 node_modules！）
+   ```
+   首轮 reconcile 以 `install=false` 的 resolve 直接命中缓存、零网络。
+6. **⚠️ 包名冲突（M4 阻塞）**：npm 上 `opencode-session-changes@1.0.0` 已被第三方（kdbsoft，`github.com/kdbsoft/opencode-session-changes`）占用。把裸名写入 `plugins` 会让宿主**下载并加载该第三方代码**（其 tui 入口因缺 react 加载失败，服务端入口却成功）。发布前必须改名（如 `opencode-session-changes-tui` 或 scoped 包），并更新文档/README。
+7. **模块解析**：宿主对 `@opencode/*`、`@opentui/*`、`solid-js` 做运行期映射（磁盘优先，找不到时回落宿主内置实例）。若插件旁存在 node_modules 副本会被优先解析 → 双运行时 → 元素成为宿主无法协调的"外来对象"（短时绘制后被丢弃）。发布物与本地 staging 均不得携带这些运行时依赖（保持 external + devDependency）。
+8. **主题色响应式**：`ctx.theme` 是活 getter（`get theme(){return themes.currentTokens()}`）。palette 必须在 `render()` 调用时读取（不得在 setup 时快照），并在重建 claim 的 `createEffect` 内显式读取主题令牌字段——主题解析/切换时该 effect 重跑、claim 以新调色板重建。标题行 `onMouseUp` 已接点击折叠（文本渲染器支持鼠标事件）。
+
 
 ---
 
@@ -193,7 +213,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
   － legacy/main.swift               −6
 ```
 
-- 标题行：`▼ Changes (N)` + 汇总 `+A −D`（绿/红，取 `theme.text.feedback.*`）
+- 标题行：`▼ Changes (N)` + 汇总 `+A −D`（绿/红，取 `theme.text.feedback.*`）；**点击标题行折叠/展开**（`onMouseUp`，折叠态同 `Ctrl+P → Changes: toggle collapse`）
 - 行：图标 + 路径（basename 高亮 `theme.text.base`，目录前缀 muted，超长 truncate 优先砍目录段）+ 右对齐 `+a −d`
 - 排序：修改 > 新增 > 删除，同组按 additions 降序
 - 上限：默认显示前 N=8 行 + `… +M more`；`Ctrl+P` 命令 `Changes: cycle limit`（8/16/all）
@@ -259,7 +279,9 @@ opencode-session-changes/
 |---|---|---|
 | **M0 骨架** | 目录 / package.json / tsconfig / 构建跑通 | `bun run build` 产出 dist，`opencode plugin add ./` 可加载（空面板） |
 | **M1 数据层** | session.diff 拉取 + session.diff 事件订阅 + classify 纯函数 + 单测 | 本地起服务端改文件，signal 数组正确更新；纯删除场景验证 `+0 −N` 判定 |
-| **M2 面板渲染** | panel.tsx 完整 UI + 折叠 kv + 点击跳 diff.open | 侧边栏目视验收（对照第 4 节规格） |
+| **M2 面板渲染** | panel.tsx 完整 UI + 折叠 kv + 点击跳 diff.open | 侧边栏目视验收（对照第 4 节规格）— **已通过（2026-10-17 E2E，见 §2.8）**；diff.open 跳转延至 M3 |
+
+> 注：M2 面板因宿主"仅绘制 render() 同步快照"的约束，实现为纯渲染器 + 数据变化重建 claim（§2.8）；M1 的事件驱动防抖重取语义不变。
 | **M3 打磨** | editing-now 标记 / limit 循环 / truncate 策略 / 非 git 目录静默 | 边界场景全绿（第 8 节矩阵） |
 | **M4 发布** | README + GIF + LICENSE + npm publish（0.1.0） | `opencode plugin add opencode-session-changes@latest` 干净环境可用 |
 
