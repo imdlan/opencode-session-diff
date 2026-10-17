@@ -21,7 +21,7 @@ import type { Plugin } from "@opencode/plugin/tui"
 import type { Color } from "@opentui/core"
 import { For, Show } from "solid-js"
 import { limitRows, type ChangedFile, type RowKind } from "./classify"
-import { SIDEBAR_WIDTH, formatCounts, layoutRow } from "./format"
+import { SIDEBAR_WIDTH, formatCounts, gapToRight, layoutRow } from "./format"
 
 type PluginContext = Plugin.Context
 
@@ -97,10 +97,15 @@ export function renderPanel(props: PanelRenderProps) {
 
   /** `▼ Changes (N)  +A −D` — totals follow the title after two spaces (docs §4).
    *  Click anywhere on the title toggles collapse. */
+  /** `▼ Changes (N)` + right-aligned `+A −D` totals ending on the same right
+   *  edge as the file rows (CONTENT_WIDTH). Click anywhere on the title
+   *  toggles collapse. */
+  const titleLeft = `${collapsed ? "▶" : "▼"} Changes (${rows.length})`
+  const titleCounts = formatCounts(totals.additions, totals.deletions)
   const title = (
     <text onMouseUp={onToggle} wrapMode="none">
-      <Colored fg={palette.base}>{`${collapsed ? "▶" : "▼"} Changes (${rows.length})`}</Colored>
-      <Counts additions={totals.additions} deletions={totals.deletions} lead="  " />
+      <Colored fg={palette.base}>{titleLeft}</Colored>
+      <Counts additions={totals.additions} deletions={totals.deletions} lead={" ".repeat(gapToRight(titleLeft, titleCounts, CONTENT_WIDTH))} />
     </text>
   )
 

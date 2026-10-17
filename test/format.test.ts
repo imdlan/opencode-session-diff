@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { SIDEBAR_WIDTH, formatCounts, layoutRow, truncatePath, visibleWidth } from "../src/format"
+import { SIDEBAR_WIDTH, formatCounts, gapToRight, layoutRow, truncatePath, visibleWidth } from "../src/format"
 
 describe("visibleWidth", () => {
   it("counts ASCII as single width", () => {
@@ -96,5 +96,20 @@ describe("layoutRow", () => {
     const row = layoutRow("•", "assets/logo.png", "")
     expect(row.gap).toBe(0)
     expect(row.path).toBe("assets/logo.png")
+  })
+})
+
+describe("gapToRight", () => {
+  it("right-aligns title totals to the content width", () => {
+    const left = "▼ Changes (4)"
+    expect(visibleWidth(left) + gapToRight(left, "+154 −18") + visibleWidth("+154 −18")).toBe(SIDEBAR_WIDTH)
+  })
+
+  it("returns 0 when there are no totals", () => {
+    expect(gapToRight("▼ Changes (0)", "")).toBe(0)
+  })
+
+  it("keeps at least one space when the label is too long", () => {
+    expect(gapToRight("x".repeat(60), "+1")).toBe(1)
   })
 })

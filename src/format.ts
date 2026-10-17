@@ -99,3 +99,11 @@ export function layoutRow(icon: string, path: string, counts: string, width: num
   const gap = countsWidth > 0 ? Math.max(width - used - visibleWidth(truncated) - countsWidth, 1) : 0
   return { path: truncated, gap }
 }
+
+/** Space needed to right-align `counts` after a fixed `left` label so both
+ *  end exactly on `width` (title line: label + gap + totals). Returns 0 when
+ *  there are no counters. */
+export function gapToRight(left: string, counts: string, width: number = SIDEBAR_WIDTH): number {
+  if (counts === "") return 0
+  return Math.max(width - visibleWidth(left) - visibleWidth(counts), 1)
+}

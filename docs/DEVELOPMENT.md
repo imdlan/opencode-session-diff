@@ -209,7 +209,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 ## 4. UI 规格（42 列宽约束）
 
 ```
-▼ Changes (4)  +154 −18
+▼ Changes (4)                              +154 −18
 • PicXure/PicXureApp.swift        +28 −9
 • Views/AnnotationOverlay.swift   +110 −3
 • i18n/locales/en.json            +13
@@ -217,6 +217,7 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 ```
 
 - 标题行与文件行均**无左侧缩进**，左缘对齐（板块外围无额外水平外边距）
+- 标题总数（`+A −D`）与文件行的计数**共用同一右缘**（`gapToRight` / `layoutRow` 均以 CONTENT_WIDTH 右对齐）
 
 - 标题行：`▼ Changes (N)` + 汇总 `+A −D`（绿/红，取 `theme.text.feedback.*`）；**点击标题行折叠/展开**（`onMouseUp`，折叠态同 `Ctrl+P → Changes: toggle collapse`）
 - 行：图标 + 路径（basename 高亮 `theme.text.base`，目录前缀 muted，超长 truncate 优先砍目录段）+ 右对齐 `+a −d`
