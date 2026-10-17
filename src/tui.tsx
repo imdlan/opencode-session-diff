@@ -78,27 +78,6 @@ export default Plugin.define({
               palette: true,
               run: toggleCollapsed,
             },
-            {
-              // Fallback for the diff overlay route: the diffs plugin's own
-              // diff.close layer is not reliably active on the route page, and
-              // the session sidebar's escape (priority 10) steals the key.
-              // Gated to the diff route only; also reachable from the palette.
-              id: "session-changes.diff-back",
-              title: "Close diff viewer",
-              group: "session-changes",
-              bind: "escape,q",
-              palette: true,
-              enabled: () => {
-                const current = ctx.ui.router.current()
-                return current.type === "plugin" && current.name === "diff"
-              },
-              run: () => {
-                const current = ctx.ui.router.current()
-                if (current.type === "plugin" && current.name === "diff") {
-                  ;(diffBack ?? (() => ctx.ui.router.navigate({ type: "home" })))()
-                }
-              },
-            },
           ],
         }))
         return null
@@ -193,26 +172,14 @@ export default Plugin.define({
     })
 
     // --- open the built-in diff viewer -------------------------------------
-    // Routes are namespaced by plugin id: a bare `{type:"plugin", name}` is
-    // resolved against THIS plugin (session-changes/diff → Unknown), so the
-    // diffs plugin id must be passed explicitly (verified in the 2.0.31
-    // router: `id: "id" in h ? h.id : t.id`). The route component reads
-    // `data.mode` as its initial diff source (Pl → Ui initialMode); "turn"
-    // calls `session.diff({sessionID})` without a message range — the WHOLE
-    // session's cumulative file diff, same data as this panel. The panel API
-    // cannot pass a mode, so it would fall back to the git "branch" source
-    // and show "No changes to show" for session-only changes.
-    let diffBack: (() => void) | undefined
+    // Use the session panel (split by default), which the host closes/restores
+    // itself — the overlay route page could not be exited reliably (Esc/q were
+    // consumed elsewhere). The panel API cannot pass a diff source, so the
+    // `diffs.source = "turn"` setting in cli.json makes the panel start on
+    // "turn" — which calls session.diff({sessionID}) — the same data as this
+    // panel. Without that setting the panel shows git "branch" changes only.
     const openDiff = () => {
-      const route = ctx.ui.router.current()
-      const sessionID = route.type === "session" ? route.sessionID : untrack(() => snapshot()).sessionID
-      diffBack = () => ctx.ui.router.navigate(route)
-      ctx.ui.router.navigate({
-        type: "plugin",
-        id: "opencode.diffs",
-        name: "diff",
-        data: { sessionID, returnRoute: route, mode: "turn" },
-      })
+      ctx.ui.panel.open("diff")
     }
 
     // --- panel claim (rebuilt on snapshot / collapse / theme change) --------

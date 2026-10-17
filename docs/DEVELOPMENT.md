@@ -224,11 +224,8 @@ V2.0.0–2.0.32 全系侧边栏仅 3 个内置注册项：`opencode.sidebar.cont
 - 排序：修改 > 新增 > 删除，同组按 additions 降序
 - 上限：默认显示前 N=8 行 + `… +M more`；`Ctrl+P` 命令 `Changes: cycle limit`（8/16/all）
 - 折叠态 `▶ Changes (4) +154 −18` 记忆到 kv
-- 点击文件列表 → 打开官方 diff 查看器：`router.navigate({type:"plugin", id:"opencode.diffs", name:"diff", data:{sessionID, returnRoute, mode:"turn"}})`
-  - 路由按插件 id 命名空间化：省略 `id` 会被解析为当前插件（`session-changes/diff` → Unknown），跨插件导航必须显式传目标插件 id
-  - 路由组件读 **`data.mode`** 作为初始 source（`Pl` → `Ui.initialMode`）；`turn` 调 `session.diff({sessionID})`（无消息范围）＝**整个 session 的累计文件 diff**，与侧栏同源
-  - panel API（`ui.panel.open`）无法携带 mode → 永远回落 git `branch` source（会话内改动显示 "No changes to show"）；且该路由本身是 absolute 全屏 overlay（官方设计）
-  - 路由态下官方 `diff.close` 图层不可靠，本插件注册 `session-changes.diff-back`（`bind: "escape"`，`enabled` 仅限 `name==="diff"` 的插件路由）兜底返回原路由
+- 点击文件列表 → 打开官方 diff **分栏 panel**：`ctx.ui.panel.open("diff")`（Esc/q 由宿主处理，可靠退出）。panel API 无法传 source → 依赖 `~/.config/opencode/cli.json` 的 `"diffs": {"source": "turn"}`（schema 已确认合法），使查看器初始 source 为 `turn`＝`session.diff`（**整个 session 的累计文件 diff**，与侧栏同源）。未设置该配置时 panel 走 git `branch` source（会话内改动可能显示 "No changes to show"）。
+- 已知限制：插件路由（`{type:"plugin", id:"opencode.diffs", name:"diff", data:{mode:"turn"}}`）可带 mode 但为全屏 overlay，且 Esc/q 在该态被会话页按键层吞掉、无法退出——故放弃路由方案。
 - 最近编辑高亮：`session.tool.input.ended` 提取编辑类工具的目标文件（权威触发）→ 5 秒将**整个路径**（目录+文件名）染为 warning 色；`session.tool.success` 的 `metadata.files` 兜底；`filesystem.changed` 作为外部编辑的补充触发
 - "editing now"：最近 2s 内 `file.edited` 命中的文件前加 `●` spinner 字符（可选，M3）
 - 空态（diff 空数组）：整节不渲染
