@@ -1,0 +1,37 @@
+{
+  "name": "opencode-session-changes",
+  "version": "0.1.0",
+  "description": "OpenCode TUI sidebar panel listing files changed by the current session (+additions/−deletions)",
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tui",
+    "sidebar",
+    "diff",
+    "session"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./tui": "./dist/tui.js"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/tui.tsx --outdir ./dist --target bun --external @opencode/plugin --external '@opencode/plugin/*' --external @opencode/client --external '@opencode/*' --external '@opentui/*' --external solid-js",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.0.32",
+    "@opencode/theme": "2.0.32",
+    "@opentui/solid": "latest",
+    "@types/bun": "^1.4.3",
+    "solid-js": "latest",
+    "typescript": "^5"
+  }
+}
