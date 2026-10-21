@@ -176,16 +176,29 @@ bun run typecheck
 
 手工验证场景：空会话隐藏、增/改/删计数、二进制文件、超长路径、`/undo` 回退、subagent 改动、会话切换、服务端重连。
 
-## 8. 发布
+## 8. 发布（2026-10-21 实测可行的流程）
+
+账号 `imdlan` 开启了 2FA；`~/.npmrc` 为 granular token（无 whoami 权限，`npm whoami` 401 属预期，不是阻碍）。发布必须走浏览器授权：**非 TTY 下 npm 遇 2FA 直接 EOTP 退出；在 PTY 中会打印授权链接并等待浏览器批准，无需 OTP 动态码。**
 
 ```sh
-npm publish --dry-run --registry=https://registry.npmjs.org
-npm stage publish --access public --registry=https://registry.npmjs.org
-# npmjs.com → Staged Packages → Approve（passkey）
-git tag vX.Y.Z && git push --follow-tags
+# 1. 前置检查（全绿再发）
+bun run typecheck && bun run build && bun test
+
+# 2. 升版本（自动 commit + tag）并推送
+npm version patch -m "chore: 发布 v%s"   # 0.x 期间 minor 为功能、patch 为修复
+git push --follow-tags origin main
+
+# 3. 带 PTY 发布（后台运行，prepack 会自动构建）
+script -q /tmp/npm-publish-tty.log npm publish --access public
+
+# 4. 从日志提取授权链接，交给用户在浏览器打开并批准（登录 imdlan）
+LC_ALL=C sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' /tmp/npm-publish-tty.log | tr '\r' '\n' | grep "npmjs.com/auth"
+
+# 5. 批准后发布自动完成（输出 + opencode-session-diff@X.Y.Z），验证：
+npm view opencode-session-diff version   # registry 与 npm 网页有分钟级延迟，重试几次
 ```
 
-版本策略：0.x 期间 minor 为功能、patch 为修复。
+旧方案（`npm stage publish` + Staged Packages 页面批准）不再使用。
 
 ## 9. 已知限制
 
