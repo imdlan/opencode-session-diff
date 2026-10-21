@@ -9,3 +9,6 @@ coverage/
 
 # 本地推广文档，不提交
 PROMOTION.md
+
+# opencode 本地会话数据
+.opencode/

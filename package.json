@@ -1,7 +1,7 @@
 {
   "name": "opencode-session-diff",
   "version": "0.1.0",
-  "description": "OpenCode TUI sidebar panel (Changes) listing files changed by the current session, with ±line counts",
+  "description": "OpenCode sidebar panel listing the current session's file changes (±line counts)",
   "license": "MIT",
   "keywords": [
     "opencode",

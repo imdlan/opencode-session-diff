@@ -72,9 +72,8 @@ export default Plugin.define({
           commands: [
             {
               id: "session-changes.toggle",
-              title: "Changes: toggle collapse",
-              description: "Collapse or expand the session changes sidebar section",
-              group: "session-changes",
+              title: "Toggle collapse",
+              group: "Changes",
               palette: true,
               run: toggleCollapsed,
             },

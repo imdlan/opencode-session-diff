@@ -54,7 +54,7 @@ opencode plugin add opencode-session-diff@latest
 |---|---|
 | 点击 **Changes** 标题 | 折叠 / 展开 |
 | 点击文件行 | 打开 diff 查看器（会话 source） |
-| `Ctrl+P` → **Changes: toggle collapse** | 键盘折叠 |
+| `Ctrl+P` → **Toggle collapse**（Changes 分组） | 键盘折叠 |
 
 折叠状态会被持久化。
 
